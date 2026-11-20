@@ -127,7 +127,11 @@ li{margin:2px 0}
   <section class="card">
     <h2>규칙</h2>
     <ol>
-      <li>말은 <b>2인전이면 각자 두 개</b>, <b>3인전이면 각자 한 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (2인전은 둘 다 네모도 돼요).</li>
+      <li>각자 말이 <b>두 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (둘 다 네모도 돼요).
+        <ul style="margin:2px 0">
+          <li>2인전: 주황 → 파랑 → 주황 → 파랑</li>
+          <li>3인전: 주황 → 파랑 → 보라 한 개씩 놓은 뒤, <b>역순</b>으로 보라 → 파랑 → 주황</li>
+        </ul></li>
       <li>내 차례에는 말 하나를 골라 움직여요. 제자리에 있을 수는 없어요.
         <ul style="margin:2px 0">
           <li><b>네모</b>: 상하좌우 한 방향으로 곧게 1~2칸</li>
@@ -148,7 +152,7 @@ li{margin:2px 0}
 (() => {
 const N = 7, CS = 60, PAD = 10;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-const PREFIX = 'maeul-fence-v4-';
+const PREFIX = 'maeul-fence-v5-';
 const KINDS = {sq:'네모', ci:'동그라미'};
 const COLORS = {1:'주황',2:'파랑',3:'보라'};
 const PCOL = o => `var(--p${o})`;
@@ -161,8 +165,13 @@ function fresh(np, starter, round){
   const breaks = {}; if(np===3) for(let o=1;o<=3;o++) breaks[o]=1;
   return {np, phase:'place', pieces:[], walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, broke:null, breaks, result:null, passed:[]};
 }
-const placeTurn = (g,i) => ((g.starter-1+i) % g.np) + 1;
-const perPlayer = g => g.np===3 ? 1 : 2;   // 3인전은 각자 말 1개
+// 2인전: 1,2,1,2 / 3인전: 한 바퀴 놓고 다음 바퀴는 역순 (1,2,3,3,2,1)
+function placeTurn(g,i){
+  let pos = i % g.np;
+  if(g.np===3 && Math.floor(i/g.np)%2===1) pos = g.np-1-pos;
+  return ((g.starter-1+pos) % g.np) + 1;
+}
+const perPlayer = g => 2;
 const totalPieces = g => g.np * perPlayer(g);
 const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
 function edgeKey(r,c,dr,dc){
