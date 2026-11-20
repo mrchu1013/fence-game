@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>마을회관 울타리게임</title>
-<meta name="description" content="말 두 개씩 움직이며 울타리를 세워 땅을 나눠 갖는 2인 대전 게임. 링크만 보내면 친구와 바로 대전.">
+<meta name="description" content="네모·동그라미 말을 움직이며 울타리를 세워 땅을 나눠 갖는 2~3인 대전 게임. 링크만 보내면 친구와 바로 대전.">
 <meta property="og:title" content="마을회관 울타리게임">
 <meta property="og:description" content="링크 받으면 바로 들어와서 한 판! 가입 필요 없어요.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +16,8 @@
   --board:#dfe6df; --grid:#b9c5bc; --cell-hi:#f6f9f6;
   --p1:#d9822b; --p1-soft:rgba(217,130,43,.22);
   --p2:#3b5bdb; --p2-soft:rgba(59,91,219,.20);
-  --accent:#2f6b4f; --ok:#2f8a55; --warn:#b4541a;
+  --p3:#9c36b5; --p3-soft:rgba(156,54,181,.20);
+  --accent:#2f6b4f; --ok:#2f8a55; --warn:#b4541a; --danger:#c92a2a;
   --font-display:"Black Han Sans","Noto Sans KR",system-ui,sans-serif;
   --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
   color-scheme:light;
@@ -26,7 +27,8 @@
   --board:#24302a; --grid:#3d4c43; --cell-hi:#2b3832;
   --p1:#f0a050; --p1-soft:rgba(240,160,80,.25);
   --p2:#7b95ff; --p2-soft:rgba(123,149,255,.24);
-  --accent:#6fc29a; --ok:#6fc29a; --warn:#f0a050; color-scheme:dark}}
+  --p3:#d07ae6; --p3-soft:rgba(208,122,230,.24);
+  --accent:#6fc29a; --ok:#6fc29a; --warn:#f0a050; --danger:#ff6b6b; color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -39,21 +41,25 @@ h2{font-size:1rem;margin:0 0 8px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 14px;border-radius:9px;cursor:pointer}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button.danger{background:var(--danger);border-color:var(--danger);color:var(--surface)}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,input:focus-visible{outline:3px solid var(--p2);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:8px 16px}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
 input{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);min-width:0}
 #joinCode{width:9em;text-transform:uppercase;letter-spacing:.15em}
 #inviteLink{flex:1;font-size:.85rem}
 .muted{color:var(--muted);font-size:.88rem}
-.players{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pl{border:2px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:10px;min-width:0}
-.pl .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.players{display:grid;grid-template-columns:repeat(var(--np,2),minmax(0,1fr));gap:8px}
+.pl{border:2px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:8px;min-width:0}
+.pl .dot{width:16px;height:16px;border-radius:50%;flex:none}
 .pl .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .pl .sc{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.2rem}
 .pl.on{border-color:currentColor}
-.pl.p1{color:var(--p1)} .pl.p2{color:var(--p2)}
+.pl.p1{color:var(--p1)} .pl.p2{color:var(--p2)} .pl.p3{color:var(--p3)}
 .pl .nm,.pl .tag{color:var(--fg)}
-.tag{font-size:.75rem;color:var(--muted);font-weight:500}
+.tag{font-size:.72rem;color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status{font-weight:700;text-align:center;min-height:1.6em}
 .conn{font-size:.82rem;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line)}
 .conn.ok{color:var(--ok)} .conn.bad{color:var(--warn)}
@@ -62,25 +68,32 @@ svg{width:100%;height:100%;display:block;touch-action:manipulation;user-select:n
 .code{font-family:ui-monospace,Consolas,monospace;font-size:1.3rem;font-weight:700;letter-spacing:.25em;background:var(--bg);padding:3px 10px;border-radius:8px;user-select:all}
 ol{margin:0;padding-left:1.2em}
 li{margin:2px 0}
+@media (max-width:420px){ .pl{padding:6px 8px;gap:6px} .pl .sc{font-size:1.05rem} }
 @media (prefers-reduced-motion: no-preference){ .pc{transition:transform .25s ease} }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>마을회관 울타리게임<small>말 두 개로 움직이고, 울타리를 세워 내 땅을 넓히는 2인 대전</small></h1>
+    <h1>마을회관 울타리게임<small>네모·동그라미 말을 움직이고, 울타리를 세워 내 땅을 넓히는 2~3인 대전</small></h1>
   </header>
 
   <section id="lobby" class="card" hidden>
-    <h2>친구와 온라인 대전</h2>
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <h2 style="margin:0">몇 명이서 할까요?</h2>
+      <div class="seg" role="group" aria-label="인원">
+        <button id="np2" aria-pressed="true">2인</button>
+        <button id="np3" aria-pressed="false">3인</button>
+      </div>
+    </div>
     <div class="row">
       <button id="btnNew" class="primary">새 판 만들기</button>
       <input id="joinCode" maxlength="5" placeholder="코드" aria-label="방 코드" autocomplete="off">
       <button id="btnJoin">참가</button>
     </div>
-    <p class="muted" style="margin:10px 0 0">새 판을 만들면 초대 링크가 나와요. 친구는 링크만 누르면 가입 없이 바로 들어와요.</p>
+    <p class="muted" id="lobbyNote" style="margin:10px 0 0">새 판을 만들면 초대 링크가 나와요. 친구는 링크만 누르면 가입 없이 바로 들어와요.</p>
     <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-    <div class="row"><button id="btnLocal">한 화면에서 둘이 하기</button></div>
+    <div class="row"><button id="btnLocal">한 화면에서 같이 하기</button></div>
   </section>
 
   <section id="game" hidden>
@@ -95,17 +108,15 @@ li{margin:2px 0}
           <button id="btnCopy" class="primary">링크 복사</button>
           <button id="btnShare" hidden>공유</button>
         </div>
-        <p class="muted" id="inviteNote" style="margin:8px 0 0">이 링크를 카톡으로 친구에게 보내세요. 게임 중에는 이 창을 닫지 마세요.</p>
+        <p class="muted" id="inviteNote" style="margin:8px 0 0"></p>
       </div>
-      <div class="players">
-        <div class="pl p1" id="pl1"><span class="dot" style="background:var(--p1)"></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm" id="nm1">주황</span><span class="tag" id="tg1"></span></span><span class="sc" id="sc1">0</span></div>
-        <div class="pl p2" id="pl2"><span class="dot" style="background:var(--p2)"></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm" id="nm2">파랑</span><span class="tag" id="tg2"></span></span><span class="sc" id="sc2">0</span></div>
-      </div>
+      <div class="players" id="players"></div>
       <div class="status" id="status" aria-live="polite"></div>
       <div class="board-box"><svg id="board" viewBox="0 0 440 440" role="img" aria-label="게임 판"></svg></div>
       <div class="row" style="justify-content:center">
-        <button id="btnSq" hidden>■ 네모 놓기</button>
-        <button id="btnCi" hidden>● 동그라미 놓기</button>
+        <button id="btnSq" hidden>■ 네모로 놓기</button>
+        <button id="btnCi" hidden>● 동그라미로 놓기</button>
+        <button id="btnBreak" hidden>벽 부수기 (1회)</button>
         <button id="btnCancel" hidden>선택 취소</button>
         <button id="btnRematch" class="primary" hidden>한 판 더</button>
         <button id="btnRetry" hidden>다시 연결</button>
@@ -116,16 +127,17 @@ li{margin:2px 0}
   <section class="card">
     <h2>규칙</h2>
     <ol>
-      <li>각자 <b>네모</b>와 <b>동그라미</b> 말을 하나씩 가져요. 처음엔 선공부터 번갈아 한 개씩, 7×7 판의 <b>아무 빈칸</b>에나 놓아요.</li>
+      <li>각자 말이 <b>두 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (둘 다 네모도 돼요).</li>
       <li>내 차례에는 말 하나를 골라 움직여요. 제자리에 있을 수는 없어요.
         <ul style="margin:2px 0">
           <li><b>네모</b>: 상하좌우 한 방향으로 곧게 1~2칸</li>
           <li><b>동그라미</b>: 상하좌우로 1칸 간 뒤, 꼭 옆으로 1칸 더 (결국 대각선 칸에 도착)</li>
         </ul>
-        가는 길에 울타리나 다른 말이 있으면 지나갈 수 없어요.</li>
+        어떤 말도 울타리나 다른 말을 뛰어넘을 수 없어요.</li>
       <li>움직인 말이 선 칸의 네 변 중 한 곳에 <b>울타리 하나</b>를 꼭 세워요. 판 테두리에는 못 세워요.</li>
       <li>울타리로 막힌 구역 안에 내 말만 있으면 그 구역 칸 수가 내 점수예요. 확정된 땅은 색이 칠해져요.</li>
-      <li>모든 구역에서 두 사람의 말이 완전히 갈라지면 끝나요. 점수가 같으면 가장 큰 한 구역이 넓은 쪽이 이겨요.</li>
+      <li>모든 구역에서 사람들의 말이 완전히 갈라지면 끝나요. 점수가 같으면 가장 큰 한 구역이 넓은 쪽이 이겨요.</li>
+      <li><b>3인전</b>에서는 한 판에 한 번, 내 차례에 말을 움직이기 전에 <b>아무 울타리 하나를 부술</b> 수 있어요. 부순 뒤에도 평소처럼 움직이고 울타리를 세워요.</li>
       <li>둘 곳이 없는 사람은 차례를 건너뛰어요.</li>
     </ol>
   </section>
@@ -136,22 +148,27 @@ li{margin:2px 0}
 (() => {
 const N = 7, CS = 60, PAD = 10;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-const PREFIX = 'maeul-fence-v2-';
+const PREFIX = 'maeul-fence-v3-';
 const KINDS = {sq:'네모', ci:'동그라미'};
+const COLORS = {1:'주황',2:'파랑',3:'보라'};
+const PCOL = o => `var(--p${o})`;
 const $ = id => document.getElementById(id);
+const players = g => Array.from({length:g.np},(_,i)=>i+1);
 
 // ---------- pure game logic ----------
-// phase 'place': players take turns putting pieces on any empty cell (starter first), then 'play'
-function fresh(starter, round){ return {phase:'place', pieces:[], walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, result:null, passed:null}; }
-const placeOrder = g => [g.starter, 3-g.starter, g.starter, 3-g.starter];
-const leftKinds = (g,o) => ['sq','ci'].filter(k=>!g.pieces.some(p=>p.o===o && p.k===k));
+// phase 'place': everyone puts 2 pieces on any empty cell in turn order (starter first), then 'play'
+function fresh(np, starter, round){
+  const breaks = {}; if(np===3) for(let o=1;o<=3;o++) breaks[o]=1;
+  return {np, phase:'place', pieces:[], walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, broke:null, breaks, result:null, passed:[]};
+}
+const placeTurn = (g,i) => ((g.starter-1+i) % g.np) + 1;
 const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
 function edgeKey(r,c,dr,dc){
   if(dr===1) return `h-${r}-${c}`; if(dr===-1) return `h-${r-1}-${c}`;
   if(dc===1) return `v-${r}-${c}`; return `v-${r}-${c-1}`;
 }
 // Square: straight line 1-2 cells. Circle: 1 cell up/down/left/right, then 1 cell sideways (must) → lands on a diagonal.
-// Every step is orthogonal, so walls always block and sealed regions stay sealed.
+// Every step is orthogonal and must not cross a wall or enter an occupied cell, so nothing jumps and sealed regions stay sealed.
 function reach(g, idx){
   const p = g.pieces[idx];
   const occ = new Set(g.pieces.filter((_,i)=>i!==idx).map(q=>q.r+','+q.c));
@@ -194,61 +211,100 @@ function regions(g){
   return regs;
 }
 function scores(g){
-  const s={1:0,2:0}, big={1:0,2:0};
+  const s={}, big={}; for(const o of players(g)){ s[o]=0; big[o]=0; }
   if(g.phase==='place') return {s,big,regs:[]};
   const regs=regions(g);
   for(const rg of regs){ if(rg.owners.size===1){ const o=[...rg.owners][0]; s[o]+=rg.cells.length; big[o]=Math.max(big[o],rg.cells.length);} }
   return {s,big,regs};
 }
-function applyMove(g, idx, r, c, key){
-  const n = JSON.parse(JSON.stringify(g)); const p=n.pieces[idx]; const o=p.o;
-  n.last={idx, from:[p.r,p.c], to:[r,c], key};
-  p.r=r; p.c=c; n.walls[key]=o; n.moves++; n.passed=null;
+// next player in order after o who can move; players without a move are skipped (passed)
+function advance(n, o){
   const {s,big,regs}=scores(n);
   if(regs.every(rg=>rg.owners.size<=1)) return finish(n,s,big);
-  if(hasAction(n,3-o)) n.turn=3-o;
-  else if(hasAction(n,o)) { n.turn=o; n.passed=3-o; }
-  else return finish(n,s,big);
-  return n;
+  n.passed=[];
+  for(let step=1; step<=n.np; step++){
+    const cand=((o-1+step) % n.np)+1;
+    if(hasAction(n,cand)){ n.turn=cand; return n; }
+    if(cand!==o) n.passed.push(cand);
+  }
+  return finish(n,s,big);
 }
 function applyPlace(g, kind, r, c){
   const n = JSON.parse(JSON.stringify(g)); const o = n.turn;
-  n.pieces.push({o, k:kind, r, c}); n.moves++; n.last=null;
-  if(n.pieces.length<4){ n.turn = placeOrder(n)[n.pieces.length]; return n; }
+  n.pieces.push({o, k:kind, r, c}); n.moves++;
+  if(n.pieces.length < n.np*2){ n.turn = placeTurn(n, n.pieces.length); return n; }
   n.phase='play';
-  if(hasAction(n,n.starter)) n.turn=n.starter;
-  else if(hasAction(n,3-n.starter)) { n.turn=3-n.starter; n.passed=n.starter; }
-  else { const {s,big}=scores(n); return finish(n,s,big); }
-  return n;
+  return advance(n, ((n.starter-2+n.np) % n.np)+1); // so the starter moves first
+}
+function applyMove(g, idx, r, c, key){
+  const n = JSON.parse(JSON.stringify(g)); const p=n.pieces[idx]; const o=p.o;
+  n.last={idx, from:[p.r,p.c], to:[r,c], key};
+  if(n.broke && n.broke.by!==o) n.broke=null;
+  p.r=r; p.c=c; n.walls[key]=o; n.moves++;
+  return advance(n, o);
+}
+function applyBreak(g, key){
+  const n = JSON.parse(JSON.stringify(g)); const o=n.turn;
+  delete n.walls[key]; n.breaks[o]=0; n.moves++; n.broke={key, by:o};
+  return n; // same player continues with a normal move
 }
 function finish(n,s,big){
-  const w = s[1]>s[2]?1: s[2]>s[1]?2: big[1]>big[2]?1: big[2]>big[1]?2:0;
-  n.result={s1:s[1],s2:s[2],winner:w}; n.turn=0; return n;
+  const ps = players(n);
+  const best = Math.max(...ps.map(o=>s[o]));
+  let top = ps.filter(o=>s[o]===best);
+  if(top.length>1){ const b=Math.max(...top.map(o=>big[o])); top=top.filter(o=>big[o]===b); }
+  n.result={s:{...s}, winners:top}; n.turn=0; return n;
 }
 const newer = (a,b) => !b || (a.round||1)>(b.round||1) || ((a.round||1)===(b.round||1) && a.moves>b.moves);
+function valid(g){
+  return g && (g.np===2||g.np===3) && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=g.np*2
+    && g.pieces.every(p=>(p.k==='sq'||p.k==='ci') && p.o>=1 && p.o<=g.np) && typeof g.walls==='object' && typeof g.moves==='number';
+}
 
 // ---------- app state ----------
-let mode=null;     // 'local' | 'host' | 'guest'
-let room=null, peer=null, conn=null, connected=false, retryTimer=null, hostTries=0;
-let G=null, sel=null, dest=null, placeKind='sq';
-const COLORS={1:'주황',2:'파랑'};
-const myColor = () => mode==='local' ? (G&&G.turn) : mode==='host' ? 1 : mode==='guest' ? 2 : 0;
+let mode=null;          // 'local' | 'host' | 'guest'
+let lobbyNp=2;
+let room=null, peer=null, connected=false, retryTimer=null, hostTries=0;
+let hostConn=null;      // guest → host
+let seats={}, conns={}; // host: color → client id / connection
+let myGuestColor=0, present={};
+let G=null, sel=null, dest=null, placeKind='sq', breakMode=false;
 
 const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
 };
-const saveGame = () => { if(room && G) store.set('mf-'+room, G); };
+const CID = (()=>{ let c=store.get('mf-cid'); if(!c){ c=Math.random().toString(36).slice(2,12); store.set('mf-cid',c); } return c; })();
+const saveGame = () => { if(room && G) store.set('mf3-'+room, G); if(mode==='host') store.set('mf3s-'+room, seats); };
+
+function myColor(){
+  if(mode==='local') return G && G.turn;
+  if(mode==='host') return 1;
+  if(mode==='guest') return myGuestColor;
+  return 0;
+}
+function everyonePresent(){
+  if(mode==='local') return true;
+  if(!G) return false;
+  return players(G).every(o=>present[o]);
+}
+function canAct(){
+  if(!G || !G.turn) return false;
+  if(mode==='local') return true;
+  return everyonePresent() && myColor()===G.turn;
+}
 
 // ---------- rendering ----------
 const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs,parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
 const X=c=>PAD+c*CS, Y=r=>PAD+r*CS;
-
-function canAct(){
-  if(!G || !G.turn) return false;
-  if(mode==='local') return true;
-  return connected && myColor()===G.turn;
+function wallLine(k, inset){
+  const [t,r,c]=k.split('-'); const R=+r, C=+c, i=inset||3;
+  return t==='h' ? {x1:X(C)+i,y1:Y(R+1),x2:X(C+1)-i,y2:Y(R+1)} : {x1:X(C+1),y1:Y(R)+i,x2:X(C+1),y2:Y(R+1)-i};
+}
+function wallHit(k){
+  const [t,r,c]=k.split('-'); const R=+r, C=+c;
+  return t==='h' ? {x:X(C),y:Y(R+1)-14,width:CS,height:28} : {x:X(C+1)-14,y:Y(R),width:28,height:CS};
 }
 
 function drawBoard(){
@@ -257,7 +313,7 @@ function drawBoard(){
   const {regs}=scores(G);
   el('rect',{x:PAD,y:PAD,width:N*CS,height:N*CS,rx:8,fill:'var(--board)'},svg);
   regs.forEach(rg=>{ if(rg.owners.size===1){ const o=[...rg.owners][0];
-    for(const [r,c] of rg.cells) el('rect',{x:X(c),y:Y(r),width:CS,height:CS,fill:o===1?'var(--p1-soft)':'var(--p2-soft)'},svg); }});
+    for(const [r,c] of rg.cells) el('rect',{x:X(c),y:Y(r),width:CS,height:CS,fill:`var(--p${o}-soft)`},svg); }});
   for(let i=1;i<N;i++){
     el('line',{x1:X(i),y1:Y(0),x2:X(i),y2:Y(N),stroke:'var(--grid)','stroke-width':1},svg);
     el('line',{x1:X(0),y1:Y(i),x2:X(N),y2:Y(i),stroke:'var(--grid)','stroke-width':1},svg);
@@ -265,7 +321,7 @@ function drawBoard(){
   el('rect',{x:PAD,y:PAD,width:N*CS,height:N*CS,rx:8,fill:'none',stroke:'var(--fg)','stroke-width':3},svg);
 
   const act = canAct();
-  const tcol = G.turn===1?'var(--p1)':'var(--p2)';
+  const tcol = PCOL(G.turn);
 
   if(act && G.phase==='place'){
     const occ = new Set(G.pieces.map(p=>p.r+','+p.c));
@@ -275,26 +331,32 @@ function drawBoard(){
       t.addEventListener('click',()=>commitPlace(r,c));
     }
   }
-
-  if(act && sel!==null && !dest){
+  if(act && G.phase==='play' && sel!==null && !dest && !breakMode){
     for(const [r,c] of targets(G,sel)){
       const t=el('rect',{x:X(c)+4,y:Y(r)+4,width:CS-8,height:CS-8,rx:8,fill:'var(--cell-hi)',stroke:tcol,'stroke-width':2,'stroke-dasharray':'5 4',style:'cursor:pointer'},svg);
       t.addEventListener('click',()=>{ dest=[r,c]; render(); });
     }
   }
   if(G.last){ const [fr,fc]=G.last.from; el('circle',{cx:X(fc)+CS/2,cy:Y(fr)+CS/2,r:5,fill:'var(--muted)',opacity:.5},svg); }
+  if(G.broke){ el('line',{...wallLine(G.broke.key),stroke:'var(--danger)','stroke-width':3,'stroke-dasharray':'2 6','stroke-linecap':'round',opacity:.8},svg); }
 
   for(const k in G.walls){
-    const [t,r,c]=k.split('-'); const R=+r, C=+c; const col=G.walls[k]===1?'var(--p1)':'var(--p2)';
     const w = G.last && G.last.key===k ? 9 : 7;
-    if(t==='h') el('line',{x1:X(C)+3,y1:Y(R+1),x2:X(C+1)-3,y2:Y(R+1),stroke:col,'stroke-width':w,'stroke-linecap':'round'},svg);
-    else el('line',{x1:X(C+1),y1:Y(R)+3,x2:X(C+1),y2:Y(R+1)-3,stroke:col,'stroke-width':w,'stroke-linecap':'round'},svg);
+    el('line',{...wallLine(k),stroke:PCOL(G.walls[k]),'stroke-width':w,'stroke-linecap':'round'},svg);
+  }
+  if(act && breakMode){
+    for(const k in G.walls){
+      const gg=el('g',{style:'cursor:pointer'},svg);
+      el('line',{...wallLine(k),stroke:'var(--danger)','stroke-width':11,'stroke-linecap':'round',opacity:.35},gg);
+      el('rect',{...wallHit(k),fill:'transparent'},gg);
+      gg.addEventListener('click',()=>commitBreak(k));
+    }
   }
 
   G.pieces.forEach((p,i)=>{
     let r=p.r,c=p.c; if(i===sel && dest){ [r,c]=dest; }
     const g=el('g',{class:'pc',transform:`translate(${X(c)+CS/2},${Y(r)+CS/2})`},svg);
-    const col=p.o===1?'var(--p1)':'var(--p2)';
+    const col=PCOL(p.o);
     if(p.k==='sq'){
       if(i===sel) el('rect',{x:-25,y:-25,width:50,height:50,rx:9,fill:'none',stroke:'var(--fg)','stroke-width':3},g);
       el('rect',{x:-19,y:-19,width:38,height:38,rx:6,fill:col,stroke:'var(--surface)','stroke-width':3},g);
@@ -304,7 +366,7 @@ function drawBoard(){
       el('circle',{r:20,fill:col,stroke:'var(--surface)','stroke-width':3},g);
       el('circle',{r:7,fill:'var(--surface)',opacity:.85},g);
     }
-    if(act && G.phase==='play' && p.o===G.turn && !dest && targets(G,i).length){
+    if(act && G.phase==='play' && !breakMode && p.o===G.turn && !dest && targets(G,i).length){
       el('circle',{r:28,fill:'transparent'},g);
       g.style.cursor='pointer';
       g.addEventListener('click',()=>{ sel = sel===i?null:i; dest=null; render(); });
@@ -314,29 +376,65 @@ function drawBoard(){
   if(act && sel!==null && dest){
     const [r,c]=dest;
     for(const k of freeEdges(G,r,c)){
-      const parts=k.split('-'); const t=parts[0], R=+parts[1], C=+parts[2];
-      let line, hit;
-      if(t==='h'){ line={x1:X(C)+3,y1:Y(R+1),x2:X(C+1)-3,y2:Y(R+1)}; hit={x:X(C),y:Y(R+1)-14,width:CS,height:28}; }
-      else { line={x1:X(C+1),y1:Y(R)+3,x2:X(C+1),y2:Y(R+1)-3}; hit={x:X(C+1)-14,y:Y(R),width:28,height:CS}; }
       const gg=el('g',{style:'cursor:pointer'},svg);
-      el('line',{...line,stroke:tcol,'stroke-width':7,'stroke-linecap':'round',opacity:.4,'stroke-dasharray':'6 5'},gg);
-      el('rect',{...hit,fill:'transparent'},gg);
+      el('line',{...wallLine(k),stroke:tcol,'stroke-width':7,'stroke-linecap':'round',opacity:.4,'stroke-dasharray':'6 5'},gg);
+      el('rect',{...wallHit(k),fill:'transparent'},gg);
       gg.addEventListener('click',()=>commit(k));
     }
   }
 }
 
+function nameOf(o){
+  if(mode==='local') return COLORS[o];
+  if(o===myColor()) return '나';
+  return mode==='host' || o!==1 ? COLORS[o] : '방장';
+}
+function renderPlayers(){
+  const box=$('players'); const np=G?G.np:2;
+  box.style.setProperty('--np', np);
+  if(box.childElementCount!==np){
+    box.innerHTML='';
+    for(let o=1;o<=np;o++){
+      const d=document.createElement('div'); d.className='pl p'+o; d.id='pl'+o;
+      d.innerHTML=`<span class="dot" style="background:var(--p${o})"></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="tag"></span></span><span class="sc">0</span>`;
+      box.appendChild(d);
+    }
+  }
+  if(!G) return;
+  const {s}=scores(G);
+  for(let o=1;o<=np;o++){
+    const d=$('pl'+o);
+    d.classList.toggle('on', G.turn===o);
+    d.querySelector('.sc').textContent=s[o];
+    d.querySelector('.nm').textContent=nameOf(o);
+    const bits=[];
+    if(mode!=='local' && nameOf(o)!==COLORS[o]) bits.push(COLORS[o]);
+    if(G.starter===o) bits.push('선공');
+    if(G.np===3) bits.push(G.breaks[o]? '부수기 1' : '부수기 끝');
+    if(mode!=='local' && !present[o]) bits.push('미접속');
+    d.querySelector('.tag').textContent=bits.join(' · ');
+  }
+}
+
 function statusText(){
-  if(mode!=='local' && !G) return '판을 불러오는 중…';
-  if(G.result){ const {s1,s2,winner}=G.result;
-    const who = winner===0 ? '무승부' : mode==='local' ? COLORS[winner]+' 승리' : (winner===myColor() ? '내가 이겼어요!' : '친구가 이겼어요');
-    return `끝! 주황 ${s1} : ${s2} 파랑 · ${who}`; }
-  const passNote = G.passed ? `(${COLORS[G.passed]}은 둘 곳이 없어 건너뜀) ` : '';
-  if(mode==='host' && !connected) return '친구가 들어오길 기다리는 중이에요';
+  if(!G) return mode==='guest' ? '방에 연결하는 중…' : '판을 불러오는 중…';
+  if(G.result){
+    const {s,winners}=G.result;
+    const score = players(G).map(o=>`${COLORS[o]} ${s[o]}`).join(' : ');
+    const who = winners.length>1 ? '공동 1등 '+winners.map(o=>COLORS[o]).join('·')
+      : (mode!=='local' && winners[0]===myColor()) ? '내가 이겼어요!' : COLORS[winners[0]]+' 승리';
+    return `끝! ${score} · ${who}`;
+  }
   if(mode==='guest' && !connected) return '방에 연결하는 중…';
-  if(mode!=='local' && myColor()!==G.turn) return passNote + '친구 차례예요';
+  if(mode!=='local' && !everyonePresent()){
+    const need = players(G).filter(o=>!present[o]).length;
+    return `친구 ${need}명을 기다리는 중이에요`;
+  }
+  const passNote = G.passed && G.passed.length ? `(${G.passed.map(o=>COLORS[o]).join('·')}은 둘 곳이 없어 건너뜀) ` : '';
+  if(mode!=='local' && myColor()!==G.turn) return passNote + `${COLORS[G.turn]} 차례예요`;
   const who = mode==='local' ? COLORS[G.turn]+' 차례 · ' : '내 차례 · ';
-  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/4 · ${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
+  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/${G.np*2} · ${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
+  if(breakMode) return '부술 울타리를 고르세요';
   if(sel===null) return passNote + who + '움직일 말을 고르세요';
   if(!dest) return G.pieces[sel].k==='sq' ? '갈 칸을 고르세요 (곧게 1~2칸)' : '갈 칸을 고르세요 (1칸 가서 옆으로 1칸)';
   return '울타리를 세울 변을 고르세요';
@@ -345,61 +443,74 @@ function statusText(){
 function render(){
   $('lobby').hidden = !!mode;
   $('game').hidden = !mode;
+  $('np2').setAttribute('aria-pressed', lobbyNp===2); $('np3').setAttribute('aria-pressed', lobbyNp===3);
   if(!mode) return;
-  if(G){
-    const {s}=scores(G);
-    $('sc1').textContent=s[1]; $('sc2').textContent=s[2];
-    $('pl1').classList.toggle('on',G.turn===1); $('pl2').classList.toggle('on',G.turn===2);
-    [1,2].forEach(o=>{
-      $('nm'+o).textContent = mode==='local' ? COLORS[o] : (myColor()===o ? '나' : '친구');
-      $('tg'+o).textContent = (mode==='local'?'':COLORS[o]) + (G.starter===o ? (mode==='local'?'선공':' · 선공') : '');
-    });
-  }
-  if(G && G.phase==='place'){ const left=leftKinds(G,G.turn); if(!left.includes(placeKind)) placeKind=left[0]||'sq'; }
-  const picking = G && G.phase==='place' && canAct() && leftKinds(G,G.turn).length===2;
-  $('btnSq').hidden = $('btnCi').hidden = !picking;
+  renderPlayers();
+  const act = canAct();
+  const placing = G && G.phase==='place' && act;
+  $('btnSq').hidden = $('btnCi').hidden = !placing;
   $('btnSq').classList.toggle('primary', placeKind==='sq'); $('btnCi').classList.toggle('primary', placeKind==='ci');
+  const canBreak = G && G.np===3 && G.phase==='play' && act && G.breaks[G.turn] && Object.keys(G.walls).length && sel===null && !(G.broke && G.broke.by===G.turn);
+  if(!canBreak) breakMode=false;
+  $('btnBreak').hidden = !canBreak;
+  $('btnBreak').textContent = breakMode ? '부수기 취소' : '벽 부수기 (1회)';
+  $('btnBreak').className = breakMode ? '' : 'danger';
   drawBoard();
   $('status').textContent = statusText();
   $('btnCancel').hidden = sel===null || !G || !!G.result;
-  $('btnRematch').hidden = !G || !G.result || (mode!=='local' && !connected);
+  $('btnRematch').hidden = !G || !G.result || (mode!=='local' && !everyonePresent());
   const online = mode==='host' || mode==='guest';
-  $('roomLabel').textContent = online ? '방 코드' : '한 화면 대전';
+  $('roomLabel').textContent = online ? '방 코드' : (G ? `한 화면 ${G.np}인전` : '');
   $('roomCode').hidden = !online; $('roomCode').textContent = room||'';
   $('conn').hidden = !online;
-  $('conn').textContent = connected ? '친구 연결됨' : (mode==='host' ? '친구 기다리는 중' : '연결 끊김');
-  $('conn').className = 'conn ' + (connected ? 'ok' : 'bad');
-  $('invite').hidden = mode!=='host' || connected;
+  if(online && G){
+    const here = players(G).filter(o=>present[o]).length;
+    $('conn').textContent = mode==='guest' && !connected ? '연결 끊김' : `${here}/${G.np}명 접속`;
+    $('conn').className = 'conn ' + (everyonePresent() ? 'ok' : 'bad');
+  }
+  $('invite').hidden = mode!=='host' || everyonePresent();
+  if(G) $('inviteNote').textContent = (G.np===3 ? '이 링크를 친구 두 명에게 보내세요.' : '이 링크를 카톡으로 친구에게 보내세요.') + ' 게임 중에는 이 창을 닫지 마세요.';
 }
 
-// ---------- networking (PeerJS: two browsers talk directly, no accounts) ----------
+// ---------- networking (PeerJS: host relays between everyone, no accounts) ----------
 function inviteUrl(code){ return location.origin + location.pathname + '?room=' + code; }
 function setUrl(q){ try{ history.replaceState(null,'',location.pathname + q); }catch(e){} }
+function sendTo(c,msg){ if(c && c.open){ try{ c.send(msg); }catch(e){} } }
 
-function send(msg){ if(conn && conn.open){ try{ conn.send(msg); }catch(e){} } }
-
-function wireConn(c){
-  if(conn && conn!==c){ try{ conn.close(); }catch(e){} }
-  conn = c;
-  c.on('open', ()=>{ connected=true; clearTimeout(retryTimer); $('btnRetry').hidden=true; send({t:'sync', game:G}); render(); });
+// host side
+function hostPresent(){ present={1:true}; for(const o in conns) if(conns[o] && conns[o].open) present[o]=true; }
+function broadcast(msg, except){ for(const o in conns) if(conns[o]!==except) sendTo(conns[o], msg); }
+function hostRoster(){ hostPresent(); broadcast({t:'roster', present}); render(); }
+function hostWire(c){
+  let color=0;
   c.on('data', msg=>{
-    if(!msg || msg.t!=='sync') return;
-    const g = msg.game;
-    if(!g){ if(G) send({t:'sync', game:G}); return; }
-    if(!valid(g)) return;
-    if(!G || newer(g,G)){ G=g; sel=null; dest=null; saveGame(); render(); }
-    else if(newer(G,g)) send({t:'sync', game:G});
+    if(!msg) return;
+    if(msg.t==='hello'){
+      const cid=String(msg.cid||'').slice(0,40);
+      color = +Object.keys(seats).find(o=>seats[o]===cid) || 0;
+      if(!color){ for(let o=2;o<=G.np;o++){ if(!seats[o] || !(conns[o]&&conns[o].open)){ color=o; break; } } }
+      if(!color){ sendTo(c,{t:'full'}); setTimeout(()=>c.close(),500); return; }
+      if(conns[color] && conns[color]!==c){ try{ conns[color].close(); }catch(e){} }
+      seats[color]=cid; conns[color]=c; saveGame();
+      sendTo(c,{t:'seat', color});
+      sendTo(c,{t:'sync', game:G});
+      hostRoster();
+    } else if(msg.t==='sync' && color){
+      const g=msg.game;
+      if(valid(g) && g.np===G.np && newer(g,G)){ G=g; sel=null; dest=null; breakMode=false; saveGame(); broadcast({t:'sync', game:G}, c); render(); }
+      else sendTo(c,{t:'sync', game:G});
+    }
   });
-  c.on('close', ()=>{ if(conn===c){ connected=false; render(); if(mode==='guest') scheduleGuestRetry(); } });
+  c.on('close', ()=>{ if(color && conns[color]===c){ delete conns[color]; hostRoster(); } });
   c.on('error', ()=>{});
 }
-function valid(g){ return g && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=4 && g.pieces.every(p=>p.k==='sq'||p.k==='ci') && typeof g.walls==='object' && typeof g.moves==='number'; }
-
-function startHost(code, existing){
+function startHost(code, np, existing){
   cleanupNet();
-  mode='host'; room=code; connected=false; sel=null; dest=null;
-  const saved = store.get('mf-'+code);
-  G = existing || (valid(saved) ? saved : null) || fresh(1,1);
+  mode='host'; room=code; sel=null; dest=null; breakMode=false;
+  const saved = store.get('mf3-'+code);
+  G = existing || (valid(saved) ? saved : null) || fresh(np||2, 1, 1);
+  seats = store.get('mf3s-'+code) || {}; conns={};
+  hostPresent(); connected=true;
   saveGame(); setUrl('?host='+code);
   $('inviteLink').value = inviteUrl(code);
   $('btnShare').hidden = !navigator.share;
@@ -407,12 +518,12 @@ function startHost(code, existing){
   if(!window.Peer){ netFail('연결 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
   peer = new Peer(PREFIX+code);
   peer.on('open', ()=>{ hostTries=0; render(); });
-  peer.on('connection', c=>wireConn(c));
+  peer.on('connection', c=>hostWire(c));
   peer.on('disconnected', ()=>{ try{ peer.reconnect(); }catch(e){} });
   peer.on('error', err=>{
     if(err.type==='unavailable-id'){
       // the old tab's id may still be held for a few seconds after a refresh
-      if(++hostTries<=6){ const p=peer; setTimeout(()=>{ if(peer===p && mode==='host'){ try{p.destroy();}catch(e){} startHost(code, G); } }, 3000); $('status').textContent='방을 다시 여는 중…'; }
+      if(++hostTries<=6){ const p=peer; setTimeout(()=>{ if(peer===p && mode==='host'){ try{p.destroy();}catch(e){} startHost(code, G.np, G); } }, 3000); $('status').textContent='방을 다시 여는 중…'; }
       else netFail('이 방 코드를 이미 다른 창에서 쓰고 있어요. 그 창을 닫거나 새 판을 만들어 주세요.');
     } else if(err.type==='network' || err.type==='server-error' || err.type==='socket-error'){
       netFail('연결 서버에 닿지 못했어요. 인터넷을 확인하고 다시 연결을 눌러 주세요.');
@@ -420,10 +531,11 @@ function startHost(code, existing){
   });
 }
 
+// guest side
 function startGuest(code){
   cleanupNet();
-  mode='guest'; room=code; connected=false; sel=null; dest=null;
-  const saved = store.get('mf-'+code);
+  mode='guest'; room=code; connected=false; sel=null; dest=null; breakMode=false; myGuestColor=0; present={};
+  const saved = store.get('mf3-'+code);
   G = valid(saved) ? saved : null;
   setUrl('?room='+code);
   render();
@@ -438,7 +550,22 @@ function startGuest(code){
 }
 function connectGuest(){
   if(mode!=='guest' || !peer || peer.destroyed) return;
-  wireConn(peer.connect(PREFIX+room, {reliable:true}));
+  if(hostConn){ try{ hostConn.close(); }catch(e){} }
+  const c = peer.connect(PREFIX+room, {reliable:true}); hostConn=c;
+  c.on('open', ()=>{ connected=true; clearTimeout(retryTimer); $('btnRetry').hidden=true; sendTo(c,{t:'hello', cid:CID}); render(); });
+  c.on('data', msg=>{
+    if(!msg) return;
+    if(msg.t==='seat'){ myGuestColor=+msg.color; render(); }
+    else if(msg.t==='roster'){ present=msg.present||{}; render(); }
+    else if(msg.t==='full'){ cleanupNet(); mode='guest'; G=null; render(); $('status').textContent='방이 꽉 찼어요. 방장에게 새 링크를 받아 주세요.'; }
+    else if(msg.t==='sync'){
+      const g=msg.game; if(!valid(g)) return;
+      if(!G || G.np!==g.np || newer(g,G) || !newer(G,g)){ G=g; sel=null; dest=null; breakMode=false; saveGame(); render(); }
+      else sendTo(c,{t:'sync', game:G});
+    }
+  });
+  c.on('close', ()=>{ if(hostConn===c){ connected=false; present={}; render(); scheduleGuestRetry(); } });
+  c.on('error', ()=>{});
   clearTimeout(retryTimer);
   retryTimer = setTimeout(()=>{ if(!connected) scheduleGuestRetry(); }, 8000);
 }
@@ -448,49 +575,57 @@ function scheduleGuestRetry(){
   retryTimer = setTimeout(connectGuest, 3000);
   $('btnRetry').hidden=false;
 }
-function netFail(msg){ connected=false; render(); $('status').textContent=msg; $('btnRetry').hidden=false; }
+function netFail(msg){ render(); $('status').textContent=msg; $('btnRetry').hidden=false; }
 function cleanupNet(){
   clearTimeout(retryTimer);
-  if(conn){ try{ conn.close(); }catch(e){} conn=null; }
+  if(hostConn){ try{ hostConn.close(); }catch(e){} hostConn=null; }
+  for(const o in conns){ try{ conns[o].close(); }catch(e){} } conns={};
   if(peer){ try{ peer.destroy(); }catch(e){} peer=null; }
-  connected=false; $('btnRetry').hidden=true;
+  connected=false; present={}; $('btnRetry').hidden=true;
+}
+function shareState(){
+  saveGame();
+  if(mode==='host') broadcast({t:'sync', game:G});
+  else if(mode==='guest') sendTo(hostConn,{t:'sync', game:G});
 }
 
 // ---------- actions ----------
 function commit(key){
   if(sel===null || !dest || !canAct()) return;
   G = applyMove(G, sel, dest[0], dest[1], key);
-  sel=null; dest=null; saveGame();
-  if(mode!=='local') send({t:'sync', game:G});
-  render();
+  sel=null; dest=null; shareState(); render();
 }
 function commitPlace(r,c){
   if(!canAct() || G.phase!=='place' || G.pieces.some(p=>p.r===r&&p.c===c)) return;
   G = applyPlace(G, placeKind, r, c);
-  sel=null; dest=null; saveGame();
-  if(mode!=='local') send({t:'sync', game:G});
-  render();
+  sel=null; dest=null; shareState(); render();
+}
+function commitBreak(key){
+  if(!canAct() || !breakMode || !G.walls[key] || !G.breaks[G.turn]) return;
+  G = applyBreak(G, key);
+  breakMode=false; sel=null; dest=null; shareState(); render();
 }
 function rematch(){
-  G = fresh(G ? 3-G.starter : 1, (G&&G.round||1)+1);
-  sel=null; dest=null; saveGame();
-  if(mode!=='local') send({t:'sync', game:G});
-  render();
+  G = fresh(G.np, (G.starter % G.np)+1, (G.round||1)+1);
+  sel=null; dest=null; breakMode=false; shareState(); render();
 }
 function randCode(){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; }
 function cleanCode(v){ return (v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
-function leave(){ cleanupNet(); mode=null; room=null; G=null; sel=null; dest=null; setUrl(''); render(); }
+function leave(){ cleanupNet(); mode=null; room=null; G=null; sel=null; dest=null; breakMode=false; setUrl(''); render(); }
 
-$('btnNew').onclick = ()=>startHost(randCode());
+$('np2').onclick = ()=>{ lobbyNp=2; render(); };
+$('np3').onclick = ()=>{ lobbyNp=3; render(); };
+$('btnNew').onclick = ()=>startHost(randCode(), lobbyNp);
 $('btnJoin').onclick = ()=>{ const c=cleanCode($('joinCode').value); if(c.length===5) startGuest(c); else $('joinCode').focus(); };
 $('joinCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnJoin').click(); });
-$('btnLocal').onclick = ()=>{ cleanupNet(); mode='local'; room=null; G=fresh(1,1); sel=null; dest=null; setUrl(''); render(); };
+$('btnLocal').onclick = ()=>{ cleanupNet(); mode='local'; room=null; G=fresh(lobbyNp,1,1); sel=null; dest=null; breakMode=false; setUrl(''); render(); };
 $('btnLeave').onclick = leave;
 $('btnSq').onclick = ()=>{ placeKind='sq'; render(); };
 $('btnCi').onclick = ()=>{ placeKind='ci'; render(); };
+$('btnBreak').onclick = ()=>{ breakMode=!breakMode; sel=null; dest=null; render(); };
 $('btnCancel').onclick = ()=>{ sel=null; dest=null; render(); };
 $('btnRematch').onclick = rematch;
-$('btnRetry').onclick = ()=>{ if(mode==='host') startHost(room, G); else if(mode==='guest') startGuest(room); };
+$('btnRetry').onclick = ()=>{ if(mode==='host') startHost(room, G&&G.np, G); else if(mode==='guest') startGuest(room); };
 $('btnCopy').onclick = async ()=>{
   const v=$('inviteLink').value;
   try{ await navigator.clipboard.writeText(v); $('btnCopy').textContent='복사됨'; setTimeout(()=>$('btnCopy').textContent='링크 복사',1500); }
