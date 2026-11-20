@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>마을회관 울타리게임</title>
+<meta name="description" content="말 두 개씩 움직이며 울타리를 세워 땅을 나눠 갖는 2인 대전 게임. 링크만 보내면 친구와 바로 대전.">
+<meta property="og:title" content="마을회관 울타리게임">
+<meta property="og:description" content="링크 받으면 바로 들어와서 한 판! 가입 필요 없어요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column — status bar, square board, action strip, rules card. Board feels like a slate yard with timber fences. */
+:root{
+  --bg:#eef1ee; --surface:#ffffff; --fg:#1d2621; --muted:#5d6a62; --line:#c9d2cc;
+  --board:#dfe6df; --grid:#b9c5bc; --cell-hi:#f6f9f6;
+  --p1:#d9822b; --p1-soft:rgba(217,130,43,.22);
+  --p2:#3b5bdb; --p2-soft:rgba(59,91,219,.20);
+  --accent:#2f6b4f; --ok:#2f8a55; --warn:#b4541a;
+  --font-display:"Black Han Sans","Noto Sans KR",system-ui,sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#141a17; --surface:#1d2521; --fg:#e7eee9; --muted:#9aa8a0; --line:#334038;
+  --board:#24302a; --grid:#3d4c43; --cell-hi:#2b3832;
+  --p1:#f0a050; --p1-soft:rgba(240,160,80,.25);
+  --p2:#7b95ff; --p2-soft:rgba(123,149,255,.24);
+  --accent:#6fc29a; --ok:#6fc29a; --warn:#f0a050; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.55}
+.wrap{max-width:560px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--font-display);font-weight:400;font-size:2rem;letter-spacing:.02em;margin:0;line-height:1.1}
+h1 small{display:block;font-family:var(--font-body);font-size:.85rem;color:var(--muted);font-weight:500;letter-spacing:0;margin-top:4px}
+h2{font-size:1rem;margin:0 0 8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 14px;border-radius:9px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--p2);outline-offset:2px}
+input{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);min-width:0}
+#joinCode{width:9em;text-transform:uppercase;letter-spacing:.15em}
+#inviteLink{flex:1;font-size:.85rem}
+.muted{color:var(--muted);font-size:.88rem}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pl{border:2px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:10px;min-width:0}
+.pl .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.pl .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pl .sc{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.2rem}
+.pl.on{border-color:currentColor}
+.pl.p1{color:var(--p1)} .pl.p2{color:var(--p2)}
+.pl .nm,.pl .tag{color:var(--fg)}
+.tag{font-size:.75rem;color:var(--muted);font-weight:500}
+.status{font-weight:700;text-align:center;min-height:1.6em}
+.conn{font-size:.82rem;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line)}
+.conn.ok{color:var(--ok)} .conn.bad{color:var(--warn)}
+.board-box{width:100%;max-width:520px;margin:0 auto;aspect-ratio:1/1}
+svg{width:100%;height:100%;display:block;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:1.3rem;font-weight:700;letter-spacing:.25em;background:var(--bg);padding:3px 10px;border-radius:8px;user-select:all}
+ol{margin:0;padding-left:1.2em}
+li{margin:2px 0}
+@media (prefers-reduced-motion: no-preference){ .pc{transition:transform .25s ease} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>마을회관 울타리게임<small>말 두 개로 움직이고, 울타리를 세워 내 땅을 넓히는 2인 대전</small></h1>
+  </header>
+
+  <section id="lobby" class="card" hidden>
+    <h2>친구와 온라인 대전</h2>
+    <div class="row">
+      <button id="btnNew" class="primary">새 판 만들기</button>
+      <input id="joinCode" maxlength="5" placeholder="코드" aria-label="방 코드" autocomplete="off">
+      <button id="btnJoin">참가</button>
+    </div>
+    <p class="muted" style="margin:10px 0 0">새 판을 만들면 초대 링크가 나와요. 친구는 링크만 누르면 가입 없이 바로 들어와요.</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <div class="row"><button id="btnLocal">한 화면에서 둘이 하기</button></div>
+  </section>
+
+  <section id="game" hidden>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="row" style="justify-content:space-between">
+        <div class="row"><span class="muted" id="roomLabel"></span><span class="code" id="roomCode" hidden></span><span class="conn" id="conn" hidden></span></div>
+        <button id="btnLeave">나가기</button>
+      </div>
+      <div class="card" id="invite" hidden style="padding:12px">
+        <div class="row">
+          <input id="inviteLink" readonly aria-label="초대 링크">
+          <button id="btnCopy" class="primary">링크 복사</button>
+          <button id="btnShare" hidden>공유</button>
+        </div>
+        <p class="muted" id="inviteNote" style="margin:8px 0 0">이 링크를 카톡으로 친구에게 보내세요. 게임 중에는 이 창을 닫지 마세요.</p>
+      </div>
+      <div class="players">
+        <div class="pl p1" id="pl1"><span class="dot" style="background:var(--p1)"></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm" id="nm1">주황</span><span class="tag" id="tg1"></span></span><span class="sc" id="sc1">0</span></div>
+        <div class="pl p2" id="pl2"><span class="dot" style="background:var(--p2)"></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm" id="nm2">파랑</span><span class="tag" id="tg2"></span></span><span class="sc" id="sc2">0</span></div>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="board-box"><svg id="board" viewBox="0 0 440 440" role="img" aria-label="게임 판"></svg></div>
+      <div class="row" style="justify-content:center">
+        <button id="btnCancel" hidden>선택 취소</button>
+        <button id="btnRematch" class="primary" hidden>한 판 더</button>
+        <button id="btnRetry" hidden>다시 연결</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>규칙</h2>
+    <ol>
+      <li>7×7 판에 각자 말이 <b>두 개</b>씩 있어요.</li>
+      <li>내 차례에는 말 하나를 골라 상하좌우로 <b>0~2칸</b> 움직여요. 울타리와 다른 말은 넘을 수 없어요.</li>
+      <li>움직인 말이 선 칸의 네 변 중 한 곳에 <b>울타리 하나</b>를 꼭 세워요. 판 테두리에는 못 세워요.</li>
+      <li>울타리로 막힌 구역 안에 내 말만 있으면 그 구역 칸 수가 내 점수예요. 확정된 땅은 색이 칠해져요.</li>
+      <li>모든 구역에서 두 사람의 말이 완전히 갈라지면 끝나요. 점수가 같으면 가장 큰 한 구역이 넓은 쪽이 이겨요.</li>
+      <li>둘 곳이 없는 사람은 차례를 건너뛰어요.</li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+const N = 7, CS = 60, PAD = 10;
+const START = [{o:1,r:1,c:1},{o:1,r:5,c:5},{o:2,r:1,c:5},{o:2,r:5,c:1}];
+const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+const PREFIX = 'maeul-fence-v1-';
+const $ = id => document.getElementById(id);
+
+// ---------- pure game logic ----------
+function fresh(starter, round){ return {pieces:START.map(p=>({...p})), walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, result:null, passed:null}; }
+const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
+function edgeKey(r,c,dr,dc){
+  if(dr===1) return `h-${r}-${c}`; if(dr===-1) return `h-${r-1}-${c}`;
+  if(dc===1) return `v-${r}-${c}`; return `v-${r}-${c-1}`;
+}
+function reach(g, idx){
+  const p = g.pieces[idx];
+  const occ = new Set(g.pieces.filter((_,i)=>i!==idx).map(q=>q.r+','+q.c));
+  const seen = new Map([[p.r+','+p.c,0]]); const q=[[p.r,p.c,0]];
+  while(q.length){
+    const [r,c,d]=q.shift(); if(d===2) continue;
+    for(const [dr,dc] of DIRS){
+      const nr=r+dr, nc=c+dc, k=nr+','+nc;
+      if(!inB(nr,nc)||g.walls[edgeKey(r,c,dr,dc)]||occ.has(k)||seen.has(k)) continue;
+      seen.set(k,d+1); q.push([nr,nc,d+1]);
+    }
+  }
+  return [...seen.keys()].map(k=>k.split(',').map(Number));
+}
+function freeEdges(g,r,c){
+  const out=[];
+  for(const [dr,dc] of DIRS){ if(inB(r+dr,c+dc)){ const k=edgeKey(r,c,dr,dc); if(!g.walls[k]) out.push(k);} }
+  return out;
+}
+function targets(g, idx){ return reach(g,idx).filter(([r,c])=>freeEdges(g,r,c).length); }
+function hasAction(g,o){ return g.pieces.some((p,i)=>p.o===o && targets(g,i).length); }
+function regions(g){
+  const id = Array.from({length:N},()=>Array(N).fill(-1)); const regs=[];
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    if(id[r][c]!==-1) continue;
+    const reg={cells:[],owners:new Set()}, k=regs.length; regs.push(reg);
+    const st=[[r,c]]; id[r][c]=k;
+    while(st.length){
+      const [y,x]=st.pop(); reg.cells.push([y,x]);
+      for(const [dr,dc] of DIRS){ const ny=y+dr,nx=x+dc;
+        if(inB(ny,nx)&&id[ny][nx]===-1&&!g.walls[edgeKey(y,x,dr,dc)]){ id[ny][nx]=k; st.push([ny,nx]); } }
+    }
+  }
+  for(const p of g.pieces){ regs[id[p.r][p.c]].owners.add(p.o); }
+  return regs;
+}
+function scores(g){
+  const regs=regions(g); const s={1:0,2:0}, big={1:0,2:0};
+  for(const rg of regs){ if(rg.owners.size===1){ const o=[...rg.owners][0]; s[o]+=rg.cells.length; big[o]=Math.max(big[o],rg.cells.length);} }
+  return {s,big,regs};
+}
+function applyMove(g, idx, r, c, key){
+  const n = JSON.parse(JSON.stringify(g)); const p=n.pieces[idx]; const o=p.o;
+  n.last={idx, from:[p.r,p.c], to:[r,c], key};
+  p.r=r; p.c=c; n.walls[key]=o; n.moves++; n.passed=null;
+  const {s,big,regs}=scores(n);
+  if(regs.every(rg=>rg.owners.size<=1)) return finish(n,s,big);
+  if(hasAction(n,3-o)) n.turn=3-o;
+  else if(hasAction(n,o)) { n.turn=o; n.passed=3-o; }
+  else return finish(n,s,big);
+  return n;
+}
+function finish(n,s,big){
+  const w = s[1]>s[2]?1: s[2]>s[1]?2: big[1]>big[2]?1: big[2]>big[1]?2:0;
+  n.result={s1:s[1],s2:s[2],winner:w}; n.turn=0; return n;
+}
+const newer = (a,b) => !b || (a.round||1)>(b.round||1) || ((a.round||1)===(b.round||1) && a.moves>b.moves);
+
+// ---------- app state ----------
+let mode=null;     // 'local' | 'host' | 'guest'
+let room=null, peer=null, conn=null, connected=false, retryTimer=null, hostTries=0;
+let G=null, sel=null, dest=null;
+const COLORS={1:'주황',2:'파랑'};
+const myColor = () => mode==='local' ? (G&&G.turn) : mode==='host' ? 1 : mode==='guest' ? 2 : 0;
+
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+const saveGame = () => { if(room && G) store.set('mf-'+room, G); };
+
+// ---------- rendering ----------
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+const X=c=>PAD+c*CS, Y=r=>PAD+r*CS;
+
+function canAct(){
+  if(!G || !G.turn) return false;
+  if(mode==='local') return true;
+  return connected && myColor()===G.turn;
+}
+
+function drawBoard(){
+  const svg=$('board'); svg.innerHTML='';
+  if(!G) return;
+  const {regs}=scores(G);
+  el('rect',{x:PAD,y:PAD,width:N*CS,height:N*CS,rx:8,fill:'var(--board)'},svg);
+  regs.forEach(rg=>{ if(rg.owners.size===1){ const o=[...rg.owners][0];
+    for(const [r,c] of rg.cells) el('rect',{x:X(c),y:Y(r),width:CS,height:CS,fill:o===1?'var(--p1-soft)':'var(--p2-soft)'},svg); }});
+  for(let i=1;i<N;i++){
+    el('line',{x1:X(i),y1:Y(0),x2:X(i),y2:Y(N),stroke:'var(--grid)','stroke-width':1},svg);
+    el('line',{x1:X(0),y1:Y(i),x2:X(N),y2:Y(i),stroke:'var(--grid)','stroke-width':1},svg);
+  }
+  el('rect',{x:PAD,y:PAD,width:N*CS,height:N*CS,rx:8,fill:'none',stroke:'var(--fg)','stroke-width':3},svg);
+
+  const act = canAct();
+  const tcol = G.turn===1?'var(--p1)':'var(--p2)';
+
+  if(act && sel!==null && !dest){
+    for(const [r,c] of targets(G,sel)){
+      const t=el('rect',{x:X(c)+4,y:Y(r)+4,width:CS-8,height:CS-8,rx:8,fill:'var(--cell-hi)',stroke:tcol,'stroke-width':2,'stroke-dasharray':'5 4',style:'cursor:pointer'},svg);
+      t.addEventListener('click',()=>{ dest=[r,c]; render(); });
+    }
+  }
+  if(G.last){ const [fr,fc]=G.last.from; el('circle',{cx:X(fc)+CS/2,cy:Y(fr)+CS/2,r:5,fill:'var(--muted)',opacity:.5},svg); }
+
+  for(const k in G.walls){
+    const [t,r,c]=k.split('-'); const R=+r, C=+c; const col=G.walls[k]===1?'var(--p1)':'var(--p2)';
+    const w = G.last && G.last.key===k ? 9 : 7;
+    if(t==='h') el('line',{x1:X(C)+3,y1:Y(R+1),x2:X(C+1)-3,y2:Y(R+1),stroke:col,'stroke-width':w,'stroke-linecap':'round'},svg);
+    else el('line',{x1:X(C+1),y1:Y(R)+3,x2:X(C+1),y2:Y(R+1)-3,stroke:col,'stroke-width':w,'stroke-linecap':'round'},svg);
+  }
+
+  G.pieces.forEach((p,i)=>{
+    let r=p.r,c=p.c; if(i===sel && dest){ [r,c]=dest; }
+    const g=el('g',{class:'pc',transform:`translate(${X(c)+CS/2},${Y(r)+CS/2})`},svg);
+    const col=p.o===1?'var(--p1)':'var(--p2)';
+    if(i===sel) el('circle',{r:25,fill:'none',stroke:'var(--fg)','stroke-width':3},g);
+    el('circle',{r:19,fill:col,stroke:'var(--surface)','stroke-width':3},g);
+    el('circle',{r:7,fill:'var(--surface)',opacity:.85},g);
+    if(act && p.o===G.turn && !dest && targets(G,i).length){
+      el('circle',{r:28,fill:'transparent'},g);
+      g.style.cursor='pointer';
+      g.addEventListener('click',()=>{ sel = sel===i?null:i; dest=null; render(); });
+    }
+  });
+
+  if(act && sel!==null && dest){
+    const [r,c]=dest;
+    for(const k of freeEdges(G,r,c)){
+      const parts=k.split('-'); const t=parts[0], R=+parts[1], C=+parts[2];
+      let line, hit;
+      if(t==='h'){ line={x1:X(C)+3,y1:Y(R+1),x2:X(C+1)-3,y2:Y(R+1)}; hit={x:X(C),y:Y(R+1)-14,width:CS,height:28}; }
+      else { line={x1:X(C+1),y1:Y(R)+3,x2:X(C+1),y2:Y(R+1)-3}; hit={x:X(C+1)-14,y:Y(R),width:28,height:CS}; }
+      const gg=el('g',{style:'cursor:pointer'},svg);
+      el('line',{...line,stroke:tcol,'stroke-width':7,'stroke-linecap':'round',opacity:.4,'stroke-dasharray':'6 5'},gg);
+      el('rect',{...hit,fill:'transparent'},gg);
+      gg.addEventListener('click',()=>commit(k));
+    }
+  }
+}
+
+function statusText(){
+  if(mode!=='local' && !G) return '판을 불러오는 중…';
+  if(G.result){ const {s1,s2,winner}=G.result;
+    const who = winner===0 ? '무승부' : mode==='local' ? COLORS[winner]+' 승리' : (winner===myColor() ? '내가 이겼어요!' : '친구가 이겼어요');
+    return `끝! 주황 ${s1} : ${s2} 파랑 · ${who}`; }
+  const passNote = G.passed ? `(${COLORS[G.passed]}은 둘 곳이 없어 건너뜀) ` : '';
+  if(mode==='host' && !connected) return '친구가 들어오길 기다리는 중이에요';
+  if(mode==='guest' && !connected) return '방에 연결하는 중…';
+  if(mode!=='local' && myColor()!==G.turn) return passNote + '친구 차례예요';
+  const who = mode==='local' ? COLORS[G.turn]+' 차례 · ' : '내 차례 · ';
+  if(sel===null) return passNote + who + '움직일 말을 고르세요';
+  if(!dest) return '갈 칸을 고르세요 (제자리도 돼요)';
+  return '울타리를 세울 변을 고르세요';
+}
+
+function render(){
+  $('lobby').hidden = !!mode;
+  $('game').hidden = !mode;
+  if(!mode) return;
+  if(G){
+    const {s}=scores(G);
+    $('sc1').textContent=s[1]; $('sc2').textContent=s[2];
+    $('pl1').classList.toggle('on',G.turn===1); $('pl2').classList.toggle('on',G.turn===2);
+    [1,2].forEach(o=>{
+      $('nm'+o).textContent = mode==='local' ? COLORS[o] : (myColor()===o ? '나' : '친구');
+      $('tg'+o).textContent = (mode==='local'?'':COLORS[o]) + (G.starter===o ? (mode==='local'?'선공':' · 선공') : '');
+    });
+  }
+  drawBoard();
+  $('status').textContent = statusText();
+  $('btnCancel').hidden = sel===null || !G || !!G.result;
+  $('btnRematch').hidden = !G || !G.result || (mode!=='local' && !connected);
+  const online = mode==='host' || mode==='guest';
+  $('roomLabel').textContent = online ? '방 코드' : '한 화면 대전';
+  $('roomCode').hidden = !online; $('roomCode').textContent = room||'';
+  $('conn').hidden = !online;
+  $('conn').textContent = connected ? '친구 연결됨' : (mode==='host' ? '친구 기다리는 중' : '연결 끊김');
+  $('conn').className = 'conn ' + (connected ? 'ok' : 'bad');
+  $('invite').hidden = mode!=='host' || connected;
+}
+
+// ---------- networking (PeerJS: two browsers talk directly, no accounts) ----------
+function inviteUrl(code){ return location.origin + location.pathname + '?room=' + code; }
+function setUrl(q){ try{ history.replaceState(null,'',location.pathname + q); }catch(e){} }
+
+function send(msg){ if(conn && conn.open){ try{ conn.send(msg); }catch(e){} } }
+
+function wireConn(c){
+  if(conn && conn!==c){ try{ conn.close(); }catch(e){} }
+  conn = c;
+  c.on('open', ()=>{ connected=true; clearTimeout(retryTimer); $('btnRetry').hidden=true; send({t:'sync', game:G}); render(); });
+  c.on('data', msg=>{
+    if(!msg || msg.t!=='sync') return;
+    const g = msg.game;
+    if(!g){ if(G) send({t:'sync', game:G}); return; }
+    if(!valid(g)) return;
+    if(!G || newer(g,G)){ G=g; sel=null; dest=null; saveGame(); render(); }
+    else if(newer(G,g)) send({t:'sync', game:G});
+  });
+  c.on('close', ()=>{ if(conn===c){ connected=false; render(); if(mode==='guest') scheduleGuestRetry(); } });
+  c.on('error', ()=>{});
+}
+function valid(g){ return g && Array.isArray(g.pieces) && g.pieces.length===4 && typeof g.walls==='object' && typeof g.moves==='number'; }
+
+function startHost(code, existing){
+  cleanupNet();
+  mode='host'; room=code; connected=false; sel=null; dest=null;
+  G = existing || store.get('mf-'+code) || fresh(1,1);
+  saveGame(); setUrl('?host='+code);
+  $('inviteLink').value = inviteUrl(code);
+  $('btnShare').hidden = !navigator.share;
+  render();
+  if(!window.Peer){ netFail('연결 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
+  peer = new Peer(PREFIX+code);
+  peer.on('open', ()=>{ hostTries=0; render(); });
+  peer.on('connection', c=>wireConn(c));
+  peer.on('disconnected', ()=>{ try{ peer.reconnect(); }catch(e){} });
+  peer.on('error', err=>{
+    if(err.type==='unavailable-id'){
+      // the old tab's id may still be held for a few seconds after a refresh
+      if(++hostTries<=6){ const p=peer; setTimeout(()=>{ if(peer===p && mode==='host'){ try{p.destroy();}catch(e){} startHost(code, G); } }, 3000); $('status').textContent='방을 다시 여는 중…'; }
+      else netFail('이 방 코드를 이미 다른 창에서 쓰고 있어요. 그 창을 닫거나 새 판을 만들어 주세요.');
+    } else if(err.type==='network' || err.type==='server-error' || err.type==='socket-error'){
+      netFail('연결 서버에 닿지 못했어요. 인터넷을 확인하고 다시 연결을 눌러 주세요.');
+    }
+  });
+}
+
+function startGuest(code){
+  cleanupNet();
+  mode='guest'; room=code; connected=false; sel=null; dest=null;
+  G = store.get('mf-'+code);
+  setUrl('?room='+code);
+  render();
+  if(!window.Peer){ netFail('연결 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
+  peer = new Peer();
+  peer.on('open', ()=>connectGuest());
+  peer.on('disconnected', ()=>{ try{ peer.reconnect(); }catch(e){} });
+  peer.on('error', err=>{
+    if(err.type==='peer-unavailable'){ $('status').textContent='방장 쪽에 아직 닿지 않았어요. 방장이 창을 열어 두었는지 확인해 주세요. 다시 시도하는 중…'; scheduleGuestRetry(); }
+    else if(err.type==='network' || err.type==='server-error' || err.type==='socket-error'){ netFail('연결 서버에 닿지 못했어요. 인터넷을 확인하고 다시 연결을 눌러 주세요.'); }
+  });
+}
+function connectGuest(){
+  if(mode!=='guest' || !peer || peer.destroyed) return;
+  wireConn(peer.connect(PREFIX+room, {reliable:true}));
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(()=>{ if(!connected) scheduleGuestRetry(); }, 8000);
+}
+function scheduleGuestRetry(){
+  if(mode!=='guest') return;
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(connectGuest, 3000);
+  $('btnRetry').hidden=false;
+}
+function netFail(msg){ connected=false; render(); $('status').textContent=msg; $('btnRetry').hidden=false; }
+function cleanupNet(){
+  clearTimeout(retryTimer);
+  if(conn){ try{ conn.close(); }catch(e){} conn=null; }
+  if(peer){ try{ peer.destroy(); }catch(e){} peer=null; }
+  connected=false; $('btnRetry').hidden=true;
+}
+
+// ---------- actions ----------
+function commit(key){
+  if(sel===null || !dest || !canAct()) return;
+  G = applyMove(G, sel, dest[0], dest[1], key);
+  sel=null; dest=null; saveGame();
+  if(mode!=='local') send({t:'sync', game:G});
+  render();
+}
+function rematch(){
+  G = fresh(G ? 3-G.starter : 1, (G&&G.round||1)+1);
+  sel=null; dest=null; saveGame();
+  if(mode!=='local') send({t:'sync', game:G});
+  render();
+}
+function randCode(){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; }
+function cleanCode(v){ return (v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function leave(){ cleanupNet(); mode=null; room=null; G=null; sel=null; dest=null; setUrl(''); render(); }
+
+$('btnNew').onclick = ()=>startHost(randCode());
+$('btnJoin').onclick = ()=>{ const c=cleanCode($('joinCode').value); if(c.length===5) startGuest(c); else $('joinCode').focus(); };
+$('joinCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnJoin').click(); });
+$('btnLocal').onclick = ()=>{ cleanupNet(); mode='local'; room=null; G=fresh(1,1); sel=null; dest=null; setUrl(''); render(); };
+$('btnLeave').onclick = leave;
+$('btnCancel').onclick = ()=>{ sel=null; dest=null; render(); };
+$('btnRematch').onclick = rematch;
+$('btnRetry').onclick = ()=>{ if(mode==='host') startHost(room, G); else if(mode==='guest') startGuest(room); };
+$('btnCopy').onclick = async ()=>{
+  const v=$('inviteLink').value;
+  try{ await navigator.clipboard.writeText(v); $('btnCopy').textContent='복사됨'; setTimeout(()=>$('btnCopy').textContent='링크 복사',1500); }
+  catch(e){ $('inviteLink').select(); }
+};
+$('btnShare').onclick = ()=>{ navigator.share({title:'마을회관 울타리게임', text:'울타리게임 한 판 하자! 링크 누르면 바로 들어와져', url:$('inviteLink').value}).catch(()=>{}); };
+
+// ---------- boot ----------
+const qs = new URLSearchParams(location.search);
+const hostCode = cleanCode(qs.get('host')), guestCode = cleanCode(qs.get('room'));
+if(hostCode.length===5) startHost(hostCode);
+else if(guestCode.length===5) startGuest(guestCode);
+else render();
+})();
+</script>
+</body>
+</html>
