@@ -104,6 +104,8 @@ li{margin:2px 0}
       <div class="status" id="status" aria-live="polite"></div>
       <div class="board-box"><svg id="board" viewBox="0 0 440 440" role="img" aria-label="게임 판"></svg></div>
       <div class="row" style="justify-content:center">
+        <button id="btnSq" hidden>■ 네모 놓기</button>
+        <button id="btnCi" hidden>● 동그라미 놓기</button>
         <button id="btnCancel" hidden>선택 취소</button>
         <button id="btnRematch" class="primary" hidden>한 판 더</button>
         <button id="btnRetry" hidden>다시 연결</button>
@@ -114,8 +116,13 @@ li{margin:2px 0}
   <section class="card">
     <h2>규칙</h2>
     <ol>
-      <li>7×7 판에 각자 말이 <b>두 개</b>씩 있어요.</li>
-      <li>내 차례에는 말 하나를 골라 상하좌우로 <b>0~2칸</b> 움직여요. 울타리와 다른 말은 넘을 수 없어요.</li>
+      <li>각자 <b>네모</b>와 <b>동그라미</b> 말을 하나씩 가져요. 처음엔 선공부터 번갈아 한 개씩, 7×7 판의 <b>아무 빈칸</b>에나 놓아요.</li>
+      <li>내 차례에는 말 하나를 골라 움직여요. 제자리에 있을 수는 없어요.
+        <ul style="margin:2px 0">
+          <li><b>네모</b>: 상하좌우 한 방향으로 곧게 1~2칸</li>
+          <li><b>동그라미</b>: 상하좌우로 1칸 간 뒤, 꼭 옆으로 1칸 더 (결국 대각선 칸에 도착)</li>
+        </ul>
+        가는 길에 울타리나 다른 말이 있으면 지나갈 수 없어요.</li>
       <li>움직인 말이 선 칸의 네 변 중 한 곳에 <b>울타리 하나</b>를 꼭 세워요. 판 테두리에는 못 세워요.</li>
       <li>울타리로 막힌 구역 안에 내 말만 있으면 그 구역 칸 수가 내 점수예요. 확정된 땅은 색이 칠해져요.</li>
       <li>모든 구역에서 두 사람의 말이 완전히 갈라지면 끝나요. 점수가 같으면 가장 큰 한 구역이 넓은 쪽이 이겨요.</li>
@@ -128,31 +135,41 @@ li{margin:2px 0}
 <script>
 (() => {
 const N = 7, CS = 60, PAD = 10;
-const START = [{o:1,r:1,c:1},{o:1,r:5,c:5},{o:2,r:1,c:5},{o:2,r:5,c:1}];
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-const PREFIX = 'maeul-fence-v1-';
+const PREFIX = 'maeul-fence-v2-';
+const KINDS = {sq:'네모', ci:'동그라미'};
 const $ = id => document.getElementById(id);
 
 // ---------- pure game logic ----------
-function fresh(starter, round){ return {pieces:START.map(p=>({...p})), walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, result:null, passed:null}; }
+// phase 'place': players take turns putting pieces on any empty cell (starter first), then 'play'
+function fresh(starter, round){ return {phase:'place', pieces:[], walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, result:null, passed:null}; }
+const placeOrder = g => [g.starter, 3-g.starter, g.starter, 3-g.starter];
+const leftKinds = (g,o) => ['sq','ci'].filter(k=>!g.pieces.some(p=>p.o===o && p.k===k));
 const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
 function edgeKey(r,c,dr,dc){
   if(dr===1) return `h-${r}-${c}`; if(dr===-1) return `h-${r-1}-${c}`;
   if(dc===1) return `v-${r}-${c}`; return `v-${r}-${c-1}`;
 }
+// Square: straight line 1-2 cells. Circle: 1 cell up/down/left/right, then 1 cell sideways (must) → lands on a diagonal.
+// Every step is orthogonal, so walls always block and sealed regions stay sealed.
 function reach(g, idx){
   const p = g.pieces[idx];
   const occ = new Set(g.pieces.filter((_,i)=>i!==idx).map(q=>q.r+','+q.c));
-  const seen = new Map([[p.r+','+p.c,0]]); const q=[[p.r,p.c,0]];
-  while(q.length){
-    const [r,c,d]=q.shift(); if(d===2) continue;
-    for(const [dr,dc] of DIRS){
-      const nr=r+dr, nc=c+dc, k=nr+','+nc;
-      if(!inB(nr,nc)||g.walls[edgeKey(r,c,dr,dc)]||occ.has(k)||seen.has(k)) continue;
-      seen.set(k,d+1); q.push([nr,nc,d+1]);
+  const ok = (r,c,dr,dc) => inB(r+dr,c+dc) && !g.walls[edgeKey(r,c,dr,dc)] && !occ.has((r+dr)+','+(c+dc));
+  const out = new Map();
+  for(const [dr,dc] of DIRS){
+    if(!ok(p.r,p.c,dr,dc)) continue;
+    const mr=p.r+dr, mc=p.c+dc;
+    if(p.k==='sq'){
+      out.set(mr+','+mc,[mr,mc]);
+      if(ok(mr,mc,dr,dc)) out.set((mr+dr)+','+(mc+dc),[mr+dr,mc+dc]);
+    } else {
+      for(const [sr,sc] of (dr? [[0,1],[0,-1]] : [[1,0],[-1,0]])){
+        if(ok(mr,mc,sr,sc)) out.set((mr+sr)+','+(mc+sc),[mr+sr,mc+sc]);
+      }
     }
   }
-  return [...seen.keys()].map(k=>k.split(',').map(Number));
+  return [...out.values()];
 }
 function freeEdges(g,r,c){
   const out=[];
@@ -177,7 +194,9 @@ function regions(g){
   return regs;
 }
 function scores(g){
-  const regs=regions(g); const s={1:0,2:0}, big={1:0,2:0};
+  const s={1:0,2:0}, big={1:0,2:0};
+  if(g.phase==='place') return {s,big,regs:[]};
+  const regs=regions(g);
   for(const rg of regs){ if(rg.owners.size===1){ const o=[...rg.owners][0]; s[o]+=rg.cells.length; big[o]=Math.max(big[o],rg.cells.length);} }
   return {s,big,regs};
 }
@@ -192,6 +211,16 @@ function applyMove(g, idx, r, c, key){
   else return finish(n,s,big);
   return n;
 }
+function applyPlace(g, kind, r, c){
+  const n = JSON.parse(JSON.stringify(g)); const o = n.turn;
+  n.pieces.push({o, k:kind, r, c}); n.moves++; n.last=null;
+  if(n.pieces.length<4){ n.turn = placeOrder(n)[n.pieces.length]; return n; }
+  n.phase='play';
+  if(hasAction(n,n.starter)) n.turn=n.starter;
+  else if(hasAction(n,3-n.starter)) { n.turn=3-n.starter; n.passed=n.starter; }
+  else { const {s,big}=scores(n); return finish(n,s,big); }
+  return n;
+}
 function finish(n,s,big){
   const w = s[1]>s[2]?1: s[2]>s[1]?2: big[1]>big[2]?1: big[2]>big[1]?2:0;
   n.result={s1:s[1],s2:s[2],winner:w}; n.turn=0; return n;
@@ -201,7 +230,7 @@ const newer = (a,b) => !b || (a.round||1)>(b.round||1) || ((a.round||1)===(b.rou
 // ---------- app state ----------
 let mode=null;     // 'local' | 'host' | 'guest'
 let room=null, peer=null, conn=null, connected=false, retryTimer=null, hostTries=0;
-let G=null, sel=null, dest=null;
+let G=null, sel=null, dest=null, placeKind='sq';
 const COLORS={1:'주황',2:'파랑'};
 const myColor = () => mode==='local' ? (G&&G.turn) : mode==='host' ? 1 : mode==='guest' ? 2 : 0;
 
@@ -238,6 +267,15 @@ function drawBoard(){
   const act = canAct();
   const tcol = G.turn===1?'var(--p1)':'var(--p2)';
 
+  if(act && G.phase==='place'){
+    const occ = new Set(G.pieces.map(p=>p.r+','+p.c));
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(occ.has(r+','+c)) continue;
+      const t=el('rect',{x:X(c)+3,y:Y(r)+3,width:CS-6,height:CS-6,rx:8,fill:'transparent',stroke:tcol,'stroke-width':1.5,'stroke-dasharray':'3 5',opacity:.7,style:'cursor:pointer'},svg);
+      t.addEventListener('click',()=>commitPlace(r,c));
+    }
+  }
+
   if(act && sel!==null && !dest){
     for(const [r,c] of targets(G,sel)){
       const t=el('rect',{x:X(c)+4,y:Y(r)+4,width:CS-8,height:CS-8,rx:8,fill:'var(--cell-hi)',stroke:tcol,'stroke-width':2,'stroke-dasharray':'5 4',style:'cursor:pointer'},svg);
@@ -257,10 +295,16 @@ function drawBoard(){
     let r=p.r,c=p.c; if(i===sel && dest){ [r,c]=dest; }
     const g=el('g',{class:'pc',transform:`translate(${X(c)+CS/2},${Y(r)+CS/2})`},svg);
     const col=p.o===1?'var(--p1)':'var(--p2)';
-    if(i===sel) el('circle',{r:25,fill:'none',stroke:'var(--fg)','stroke-width':3},g);
-    el('circle',{r:19,fill:col,stroke:'var(--surface)','stroke-width':3},g);
-    el('circle',{r:7,fill:'var(--surface)',opacity:.85},g);
-    if(act && p.o===G.turn && !dest && targets(G,i).length){
+    if(p.k==='sq'){
+      if(i===sel) el('rect',{x:-25,y:-25,width:50,height:50,rx:9,fill:'none',stroke:'var(--fg)','stroke-width':3},g);
+      el('rect',{x:-19,y:-19,width:38,height:38,rx:6,fill:col,stroke:'var(--surface)','stroke-width':3},g);
+      el('rect',{x:-6,y:-6,width:12,height:12,rx:2,fill:'var(--surface)',opacity:.85},g);
+    } else {
+      if(i===sel) el('circle',{r:26,fill:'none',stroke:'var(--fg)','stroke-width':3},g);
+      el('circle',{r:20,fill:col,stroke:'var(--surface)','stroke-width':3},g);
+      el('circle',{r:7,fill:'var(--surface)',opacity:.85},g);
+    }
+    if(act && G.phase==='play' && p.o===G.turn && !dest && targets(G,i).length){
       el('circle',{r:28,fill:'transparent'},g);
       g.style.cursor='pointer';
       g.addEventListener('click',()=>{ sel = sel===i?null:i; dest=null; render(); });
@@ -292,8 +336,9 @@ function statusText(){
   if(mode==='guest' && !connected) return '방에 연결하는 중…';
   if(mode!=='local' && myColor()!==G.turn) return passNote + '친구 차례예요';
   const who = mode==='local' ? COLORS[G.turn]+' 차례 · ' : '내 차례 · ';
+  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/4 · ${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
   if(sel===null) return passNote + who + '움직일 말을 고르세요';
-  if(!dest) return '갈 칸을 고르세요 (제자리도 돼요)';
+  if(!dest) return G.pieces[sel].k==='sq' ? '갈 칸을 고르세요 (곧게 1~2칸)' : '갈 칸을 고르세요 (1칸 가서 옆으로 1칸)';
   return '울타리를 세울 변을 고르세요';
 }
 
@@ -310,6 +355,10 @@ function render(){
       $('tg'+o).textContent = (mode==='local'?'':COLORS[o]) + (G.starter===o ? (mode==='local'?'선공':' · 선공') : '');
     });
   }
+  if(G && G.phase==='place'){ const left=leftKinds(G,G.turn); if(!left.includes(placeKind)) placeKind=left[0]||'sq'; }
+  const picking = G && G.phase==='place' && canAct() && leftKinds(G,G.turn).length===2;
+  $('btnSq').hidden = $('btnCi').hidden = !picking;
+  $('btnSq').classList.toggle('primary', placeKind==='sq'); $('btnCi').classList.toggle('primary', placeKind==='ci');
   drawBoard();
   $('status').textContent = statusText();
   $('btnCancel').hidden = sel===null || !G || !!G.result;
@@ -344,12 +393,13 @@ function wireConn(c){
   c.on('close', ()=>{ if(conn===c){ connected=false; render(); if(mode==='guest') scheduleGuestRetry(); } });
   c.on('error', ()=>{});
 }
-function valid(g){ return g && Array.isArray(g.pieces) && g.pieces.length===4 && typeof g.walls==='object' && typeof g.moves==='number'; }
+function valid(g){ return g && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=4 && g.pieces.every(p=>p.k==='sq'||p.k==='ci') && typeof g.walls==='object' && typeof g.moves==='number'; }
 
 function startHost(code, existing){
   cleanupNet();
   mode='host'; room=code; connected=false; sel=null; dest=null;
-  G = existing || store.get('mf-'+code) || fresh(1,1);
+  const saved = store.get('mf-'+code);
+  G = existing || (valid(saved) ? saved : null) || fresh(1,1);
   saveGame(); setUrl('?host='+code);
   $('inviteLink').value = inviteUrl(code);
   $('btnShare').hidden = !navigator.share;
@@ -373,7 +423,8 @@ function startHost(code, existing){
 function startGuest(code){
   cleanupNet();
   mode='guest'; room=code; connected=false; sel=null; dest=null;
-  G = store.get('mf-'+code);
+  const saved = store.get('mf-'+code);
+  G = valid(saved) ? saved : null;
   setUrl('?room='+code);
   render();
   if(!window.Peer){ netFail('연결 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
@@ -413,6 +464,13 @@ function commit(key){
   if(mode!=='local') send({t:'sync', game:G});
   render();
 }
+function commitPlace(r,c){
+  if(!canAct() || G.phase!=='place' || G.pieces.some(p=>p.r===r&&p.c===c)) return;
+  G = applyPlace(G, placeKind, r, c);
+  sel=null; dest=null; saveGame();
+  if(mode!=='local') send({t:'sync', game:G});
+  render();
+}
 function rematch(){
   G = fresh(G ? 3-G.starter : 1, (G&&G.round||1)+1);
   sel=null; dest=null; saveGame();
@@ -428,6 +486,8 @@ $('btnJoin').onclick = ()=>{ const c=cleanCode($('joinCode').value); if(c.length
 $('joinCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnJoin').click(); });
 $('btnLocal').onclick = ()=>{ cleanupNet(); mode='local'; room=null; G=fresh(1,1); sel=null; dest=null; setUrl(''); render(); };
 $('btnLeave').onclick = leave;
+$('btnSq').onclick = ()=>{ placeKind='sq'; render(); };
+$('btnCi').onclick = ()=>{ placeKind='ci'; render(); };
 $('btnCancel').onclick = ()=>{ sel=null; dest=null; render(); };
 $('btnRematch').onclick = rematch;
 $('btnRetry').onclick = ()=>{ if(mode==='host') startHost(room, G); else if(mode==='guest') startGuest(room); };
