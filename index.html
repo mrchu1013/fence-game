@@ -127,7 +127,7 @@ li{margin:2px 0}
   <section class="card">
     <h2>규칙</h2>
     <ol>
-      <li>각자 말이 <b>두 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (둘 다 네모도 돼요).
+      <li>각자 <b>네모 하나</b>와 <b>동그라미 하나</b>를 가져요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 어느 쪽을 먼저 놓을지 고르고, 다음 차례엔 남은 모양을 놓아요.
         <ul style="margin:2px 0">
           <li>2인전: 주황 → 파랑 한 개씩 놓은 뒤, <b>역순</b>으로 파랑 → 주황</li>
           <li>3인전: 주황 → 파랑 → 보라 한 개씩 놓은 뒤, <b>역순</b>으로 보라 → 파랑 → 주황</li>
@@ -152,7 +152,7 @@ li{margin:2px 0}
 (() => {
 const N = 7, CS = 60, PAD = 10;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-const PREFIX = 'maeul-fence-v6-';
+const PREFIX = 'maeul-fence-v7-';
 const KINDS = {sq:'네모', ci:'동그라미'};
 const COLORS = {1:'주황',2:'파랑',3:'보라'};
 const PCOL = o => `var(--p${o})`;
@@ -172,6 +172,8 @@ function placeTurn(g,i){
   return ((g.starter-1+pos) % g.np) + 1;
 }
 const perPlayer = g => 2;
+// 각자 네모 1개 + 동그라미 1개. 먼저 놓을 모양만 고를 수 있음
+const leftKinds = (g,o) => ['sq','ci'].filter(k=>!g.pieces.some(p=>p.o===o && p.k===k));
 const totalPieces = g => g.np * perPlayer(g);
 const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
 function edgeKey(r,c,dr,dc){
@@ -242,6 +244,7 @@ function advance(n, o){
 }
 function applyPlace(g, kind, r, c){
   const n = JSON.parse(JSON.stringify(g)); const o = n.turn;
+  if(!leftKinds(n,o).includes(kind)) kind = leftKinds(n,o)[0];
   n.pieces.push({o, k:kind, r, c}); n.moves++;
   if(n.pieces.length < totalPieces(n)){ n.turn = placeTurn(n, n.pieces.length); return n; }
   n.phase='play';
@@ -269,7 +272,8 @@ function finish(n,s,big){
 const newer = (a,b) => !b || (a.round||1)>(b.round||1) || ((a.round||1)===(b.round||1) && a.moves>b.moves);
 function valid(g){
   return g && (g.np===2||g.np===3) && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=totalPieces(g)
-    && g.pieces.every(p=>(p.k==='sq'||p.k==='ci') && p.o>=1 && p.o<=g.np) && typeof g.walls==='object' && typeof g.moves==='number';
+    && g.pieces.every(p=>(p.k==='sq'||p.k==='ci') && p.o>=1 && p.o<=g.np)
+    && g.pieces.every((p,i)=>!g.pieces.some((q,j)=>j<i && q.o===p.o && q.k===p.k)) && typeof g.walls==='object' && typeof g.moves==='number';
 }
 
 // ---------- app state ----------
@@ -444,7 +448,7 @@ function statusText(){
   const passNote = G.passed && G.passed.length ? `(${G.passed.map(o=>COLORS[o]).join('·')}은 둘 곳이 없어 건너뜀) ` : '';
   if(mode!=='local' && myColor()!==G.turn) return passNote + `${COLORS[G.turn]} 차례예요`;
   const who = mode==='local' ? COLORS[G.turn]+' 차례 · ' : '내 차례 · ';
-  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/${totalPieces(G)} ·${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
+  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/${totalPieces(G)} · ${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
   if(breakMode) return '부술 울타리를 고르세요';
   if(sel===null) return passNote + who + '움직일 말을 고르세요';
   if(!dest) return G.pieces[sel].k==='sq' ? '갈 칸을 고르세요 (곧게 1~2칸)' : '갈 칸을 고르세요 (1칸 가서 옆으로 1칸)';
@@ -458,7 +462,8 @@ function render(){
   if(!mode) return;
   renderPlayers();
   const act = canAct();
-  const placing = G && G.phase==='place' && act;
+  if(G && G.phase==='place'){ const left=leftKinds(G,G.turn); if(!left.includes(placeKind)) placeKind=left[0]||'sq'; }
+  const placing = G && G.phase==='place' && act && leftKinds(G,G.turn).length===2;
   $('btnSq').hidden = $('btnCi').hidden = !placing;
   $('btnSq').classList.toggle('primary', placeKind==='sq'); $('btnCi').classList.toggle('primary', placeKind==='ci');
   const canBreak = G && G.np===3 && G.phase==='play' && act && G.breaks[G.turn] && Object.keys(G.walls).length && sel===null && !(G.broke && G.broke.by===G.turn);
