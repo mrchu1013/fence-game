@@ -127,7 +127,7 @@ li{margin:2px 0}
   <section class="card">
     <h2>규칙</h2>
     <ol>
-      <li>각자 말이 <b>두 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (둘 다 네모도 돼요).</li>
+      <li>말은 <b>2인전이면 각자 두 개</b>, <b>3인전이면 각자 한 개</b>예요. 처음엔 선공부터 차례대로 한 개씩, 7×7 판의 <b>아무 빈칸</b>에 놓아요. 놓을 때마다 <b>네모</b>로 할지 <b>동그라미</b>로 할지 골라요 (2인전은 둘 다 네모도 돼요).</li>
       <li>내 차례에는 말 하나를 골라 움직여요. 제자리에 있을 수는 없어요.
         <ul style="margin:2px 0">
           <li><b>네모</b>: 상하좌우 한 방향으로 곧게 1~2칸</li>
@@ -148,7 +148,7 @@ li{margin:2px 0}
 (() => {
 const N = 7, CS = 60, PAD = 10;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-const PREFIX = 'maeul-fence-v3-';
+const PREFIX = 'maeul-fence-v4-';
 const KINDS = {sq:'네모', ci:'동그라미'};
 const COLORS = {1:'주황',2:'파랑',3:'보라'};
 const PCOL = o => `var(--p${o})`;
@@ -162,6 +162,8 @@ function fresh(np, starter, round){
   return {np, phase:'place', pieces:[], walls:{}, turn:starter, starter, round:round||1, moves:0, last:null, broke:null, breaks, result:null, passed:[]};
 }
 const placeTurn = (g,i) => ((g.starter-1+i) % g.np) + 1;
+const perPlayer = g => g.np===3 ? 1 : 2;   // 3인전은 각자 말 1개
+const totalPieces = g => g.np * perPlayer(g);
 const inB = (r,c) => r>=0 && c>=0 && r<N && c<N;
 function edgeKey(r,c,dr,dc){
   if(dr===1) return `h-${r}-${c}`; if(dr===-1) return `h-${r-1}-${c}`;
@@ -232,7 +234,7 @@ function advance(n, o){
 function applyPlace(g, kind, r, c){
   const n = JSON.parse(JSON.stringify(g)); const o = n.turn;
   n.pieces.push({o, k:kind, r, c}); n.moves++;
-  if(n.pieces.length < n.np*2){ n.turn = placeTurn(n, n.pieces.length); return n; }
+  if(n.pieces.length < totalPieces(n)){ n.turn = placeTurn(n, n.pieces.length); return n; }
   n.phase='play';
   return advance(n, ((n.starter-2+n.np) % n.np)+1); // so the starter moves first
 }
@@ -257,7 +259,7 @@ function finish(n,s,big){
 }
 const newer = (a,b) => !b || (a.round||1)>(b.round||1) || ((a.round||1)===(b.round||1) && a.moves>b.moves);
 function valid(g){
-  return g && (g.np===2||g.np===3) && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=g.np*2
+  return g && (g.np===2||g.np===3) && (g.phase==='place'||g.phase==='play') && Array.isArray(g.pieces) && g.pieces.length<=totalPieces(g)
     && g.pieces.every(p=>(p.k==='sq'||p.k==='ci') && p.o>=1 && p.o<=g.np) && typeof g.walls==='object' && typeof g.moves==='number';
 }
 
@@ -433,7 +435,7 @@ function statusText(){
   const passNote = G.passed && G.passed.length ? `(${G.passed.map(o=>COLORS[o]).join('·')}은 둘 곳이 없어 건너뜀) ` : '';
   if(mode!=='local' && myColor()!==G.turn) return passNote + `${COLORS[G.turn]} 차례예요`;
   const who = mode==='local' ? COLORS[G.turn]+' 차례 · ' : '내 차례 · ';
-  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/${G.np*2} · ${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
+  if(G.phase==='place') return `말 놓기 ${G.pieces.length+1}/${totalPieces(G)} ·${who}${KINDS[placeKind]}를 놓을 칸을 고르세요`;
   if(breakMode) return '부술 울타리를 고르세요';
   if(sel===null) return passNote + who + '움직일 말을 고르세요';
   if(!dest) return G.pieces[sel].k==='sq' ? '갈 칸을 고르세요 (곧게 1~2칸)' : '갈 칸을 고르세요 (1칸 가서 옆으로 1칸)';
